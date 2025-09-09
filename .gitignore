@@ -1,0 +1,44 @@
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE / Editor settings
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.*
+
+# SQLite or other local databases (if any)
+*.sqlite3
+*.db
+
+# Uvicorn reload cache
+.pytest_cache/
+.uvicorn/
+
+# Build / Packaging
+build/
+dist/
+*.egg-info/
+
+# Frontend build (if using React/Vue later)
+frontend/node_modules/
+frontend/dist/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
