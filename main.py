@@ -1,27 +1,18 @@
 from fastapi import FastAPI, UploadFile, Form
-from transformers import ViltProcessor, ViltForQuestionAnswering
+from fastapi.responses import HTMLResponse
 from PIL import Image
-import torch
 import io
+from utils.blip2_model import get_blip2_answer
 
 app = FastAPI()
 
-# Load model + processor once globally
-processor = ViltProcessor.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
-model = ViltForQuestionAnswering.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
+@app.get("/")
+async def home():
+    with open("static/index.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
 
 @app.post("/ask")
-async def ask_image_question(file: UploadFile, question: str = Form(...)):
-    # Read image
-    image_bytes = await file.read()
-    image = Image.open(io.BytesIO(image_bytes))
-
-    # Preprocess
-    inputs = processor(image, question, return_tensors="pt")
-    outputs = model(**inputs)
-
-    # Get answer
-    idx = outputs.logits.argmax(-1).item()
-    answer = model.config.id2label[idx]
-
-    return {"question": question, "answer": answer}
+async def ask_question(file: UploadFile, question: str = Form(...)):
+    image = Image.open(io.BytesIO(await file.read()))
+    answer = get_blip2_answer(image, question)
+    return {"answer": answer}

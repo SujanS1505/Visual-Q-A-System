@@ -1,0 +1,65 @@
+<!-- static/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BLIP-2 Visual QA</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 700px; margin: 50px auto; }
+        h1 { text-align: center; }
+        form { display: flex; flex-direction: column; gap: 15px; }
+        input[type="text"], input[type="file"] { padding: 10px; font-size: 16px; }
+        button { padding: 10px; font-size: 16px; cursor: pointer; }
+        #response { margin-top: 20px; padding: 10px; background: #f0f0f0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>BLIP-2 Visual QA</h1>
+
+    <form id="qa-form">
+        <label>Upload Image:</label>
+        <input type="file" id="image" accept="image/*" required>
+
+        <label>Ask a Question:</label>
+        <input type="text" id="question" placeholder="Type your question here..." required>
+
+        <button type="submit">Submit</button>
+    </form>
+
+    <div id="response"></div>
+
+    <script>
+        const form = document.getElementById('qa-form');
+        const responseDiv = document.getElementById('response');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const imageFile = document.getElementById('image').files[0];
+            const question = document.getElementById('question').value;
+
+            if (!imageFile || !question) return;
+
+            const formData = new FormData();
+            formData.append('file', imageFile);  // Must match your main.py parameter
+            formData.append('question', question);
+
+            responseDiv.textContent = "Processing...";
+
+            try {
+                const res = await fetch('/ask', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!res.ok) throw new Error("Request failed");
+
+                const data = await res.json();
+                responseDiv.textContent = "Answer: " + data.answer;
+            } catch (err) {
+                responseDiv.textContent = "Error: " + err.message;
+            }
+        });
+    </script>
+</body>
+</html>
