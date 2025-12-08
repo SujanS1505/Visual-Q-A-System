@@ -106,6 +106,14 @@
     }
 
     .preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .preview video { width: 100%; height: 100%; object-fit: cover; }
+
+    .cam-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 10px 0 8px;
+    }
 
     .status { color: var(--muted); margin-top: 8px; }
     .answer { font-size: 1.5rem; font-weight: 600; color: #7dd3fc; margin-top: 6px; }
@@ -116,11 +124,19 @@
   <main class="shell">
     <section>
       <h1>Visual Question Answering</h1>
-      <p class="lead">Upload an image, ask a question about it, and the model will predict the answer.</p>
+      <p class="lead">Upload an image or use your camera, ask a question about it, and the model will predict the answer.</p>
       <div class="card">
         <label for="image">Image</label>
         <input type="file" id="image" accept="image/*" />
-        <div class="preview" id="preview">Drop an image or choose a file.</div>
+        <div class="cam-row">
+          <button id="startCam" type="button">Use Camera</button>
+          <button id="capture" type="button">Capture</button>
+        </div>
+        <div class="preview" id="preview">
+          <video id="video" playsinline muted style="display:none;"></video>
+          <span id="previewText">Drop an image, choose a file, or start the camera.</span>
+        </div>
+        <canvas id="canvas" style="display:none;"></canvas>
 
         <label for="question" style="margin-top: 14px;">Question</label>
         <textarea id="question" rows="3" placeholder="e.g., What color is the car?"></textarea>
@@ -148,13 +164,22 @@
     const imageInput = document.getElementById('image');
     const questionInput = document.getElementById('question');
     const submitBtn = document.getElementById('submit');
+    const startCamBtn = document.getElementById('startCam');
+    const captureBtn = document.getElementById('capture');
+    const videoEl = document.getElementById('video');
+    const canvasEl = document.getElementById('canvas');
+    const previewText = document.getElementById('previewText');
     const preview = document.getElementById('preview');
     const statusEl = document.getElementById('status');
     const answerEl = document.getElementById('answer');
     const errorEl = document.getElementById('error');
 
+    let stream = null;
+    let capturedBlob = null;
+
     imageInput.addEventListener('change', () => {
       const file = imageInput.files?.[0];
+      capturedBlob = null;
       if (!file) {
         preview.innerHTML = 'Drop an image or choose a file.';
         return;
@@ -169,15 +194,75 @@
       reader.readAsDataURL(file);
     });
 
+    startCamBtn.addEventListener('click', async () => {
+      errorEl.textContent = '';
+      capturedBlob = null;
+      try {
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop());
+        }
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (!preview.contains(videoEl)) {
+          preview.innerHTML = '';
+          preview.appendChild(videoEl);
+          preview.appendChild(previewText);
+        }
+        videoEl.srcObject = stream;
+        videoEl.style.display = 'block';
+        previewText.textContent = 'Camera live. Click Capture to take a frame.';
+        await videoEl.play();
+      } catch (err) {
+        errorEl.textContent = 'Camera access denied or unavailable.';
+        console.error(err);
+      }
+    });
+
+    captureBtn.addEventListener('click', () => {
+      if (!stream) {
+        errorEl.textContent = 'Start the camera first.';
+        return;
+      }
+      const track = stream.getVideoTracks()[0];
+      if (!track) {
+        errorEl.textContent = 'No video track available.';
+        return;
+      }
+
+      const { videoWidth, videoHeight } = videoEl;
+      canvasEl.width = videoWidth || 640;
+      canvasEl.height = videoHeight || 480;
+      const ctx = canvasEl.getContext('2d');
+      ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+      canvasEl.toBlob(blob => {
+        if (!blob) {
+          errorEl.textContent = 'Failed to capture frame.';
+          return;
+        }
+        capturedBlob = blob;
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(blob);
+        preview.innerHTML = '';
+        preview.appendChild(img);
+        errorEl.textContent = '';
+        statusEl.textContent = 'Captured frame ready.';
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop());
+          stream = null;
+        }
+      }, 'image/png');
+    });
+
     submitBtn.addEventListener('click', async () => {
-      const file = imageInput.files?.[0];
+      const file = capturedBlob
+        ? new File([capturedBlob], 'capture.png', { type: 'image/png' })
+        : imageInput.files?.[0];
       const question = questionInput.value.trim();
 
       answerEl.textContent = '';
       errorEl.textContent = '';
 
       if (!file || !question) {
-        errorEl.textContent = 'Please choose an image and enter a question.';
+        errorEl.textContent = 'Provide a photo (upload or capture) and enter a question.';
         return;
       }
 
