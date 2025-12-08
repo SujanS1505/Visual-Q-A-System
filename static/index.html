@@ -1,65 +1,212 @@
-<!-- static/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>BLIP-2 Visual QA</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 700px; margin: 50px auto; }
-        h1 { text-align: center; }
-        form { display: flex; flex-direction: column; gap: 15px; }
-        input[type="text"], input[type="file"] { padding: 10px; font-size: 16px; }
-        button { padding: 10px; font-size: 16px; cursor: pointer; }
-        #response { margin-top: 20px; padding: 10px; background: #f0f0f0; border-radius: 5px; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visual QA System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #111827;
+      --accent: #38bdf8;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --border: rgba(148, 163, 184, 0.2);
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.12), transparent 35%),
+                  radial-gradient(circle at 80% 0%, rgba(94, 234, 212, 0.18), transparent 35%),
+                  var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 16px;
+    }
+
+    .shell {
+      width: min(1100px, 95vw);
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(56, 189, 248, 0)) var(--card);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      border-radius: 18px;
+      padding: 28px;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .shell { grid-template-columns: 1fr; }
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    p.lead {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .card {
+      background: rgba(17, 24, 39, 0.7);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+    }
+
+    label { display: block; margin-bottom: 6px; color: var(--muted); }
+
+    input, textarea, button {
+      width: 100%;
+      font: inherit;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text);
+      padding: 12px;
+      transition: border-color 0.2s ease, transform 0.1s ease;
+    }
+
+    input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+
+    button {
+      background: linear-gradient(135deg, #38bdf8, #22d3ee);
+      color: #0b1224;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      margin-top: 8px;
+    }
+
+    button:hover { transform: translateY(-1px); }
+
+    .preview {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+      min-height: 260px;
+      background: rgba(255, 255, 255, 0.02);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .status { color: var(--muted); margin-top: 8px; }
+    .answer { font-size: 1.5rem; font-weight: 600; color: #7dd3fc; margin-top: 6px; }
+    .error { color: #fca5a5; font-weight: 600; margin-top: 6px; }
+  </style>
 </head>
 <body>
-    <h1>BLIP-2 Visual QA</h1>
+  <main class="shell">
+    <section>
+      <h1>Visual Question Answering</h1>
+      <p class="lead">Upload an image, ask a question about it, and the model will predict the answer.</p>
+      <div class="card">
+        <label for="image">Image</label>
+        <input type="file" id="image" accept="image/*" />
+        <div class="preview" id="preview">Drop an image or choose a file.</div>
 
-    <form id="qa-form">
-        <label>Upload Image:</label>
-        <input type="file" id="image" accept="image/*" required>
+        <label for="question" style="margin-top: 14px;">Question</label>
+        <textarea id="question" rows="3" placeholder="e.g., What color is the car?"></textarea>
 
-        <label>Ask a Question:</label>
-        <input type="text" id="question" placeholder="Type your question here..." required>
+        <button id="submit">Ask</button>
+        <div class="status" id="status">Waiting for input.</div>
+        <div class="answer" id="answer"></div>
+        <div class="error" id="error"></div>
+      </div>
+    </section>
 
-        <button type="submit">Submit</button>
-    </form>
+    <section class="card">
+      <h3 style="margin-top: 0;">How it works</h3>
+      <p class="lead" style="margin-bottom: 10px;">The backend uses a ViLT model fine-tuned for VQA. The frontend posts the image and question to <code>/v1/vqa</code> and displays the model's predicted answer.</p>
+      <ul style="padding-left: 18px; color: var(--muted); line-height: 1.6; margin-top: 0;">
+        <li>Supports common image formats (PNG, JPG, JPEG).</li>
+        <li>All processing runs server-side via FastAPI.</li>
+        <li>Keep questions concise for best answers.</li>
+        <li>Health check is available at <code>/health</code>.</li>
+      </ul>
+    </section>
+  </main>
 
-    <div id="response"></div>
+  <script>
+    const imageInput = document.getElementById('image');
+    const questionInput = document.getElementById('question');
+    const submitBtn = document.getElementById('submit');
+    const preview = document.getElementById('preview');
+    const statusEl = document.getElementById('status');
+    const answerEl = document.getElementById('answer');
+    const errorEl = document.getElementById('error');
 
-    <script>
-        const form = document.getElementById('qa-form');
-        const responseDiv = document.getElementById('response');
+    imageInput.addEventListener('change', () => {
+      const file = imageInput.files?.[0];
+      if (!file) {
+        preview.innerHTML = 'Drop an image or choose a file.';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        preview.innerHTML = '';
+        preview.appendChild(img);
+      };
+      reader.readAsDataURL(file);
+    });
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+    submitBtn.addEventListener('click', async () => {
+      const file = imageInput.files?.[0];
+      const question = questionInput.value.trim();
 
-            const imageFile = document.getElementById('image').files[0];
-            const question = document.getElementById('question').value;
+      answerEl.textContent = '';
+      errorEl.textContent = '';
 
-            if (!imageFile || !question) return;
+      if (!file || !question) {
+        errorEl.textContent = 'Please choose an image and enter a question.';
+        return;
+      }
 
-            const formData = new FormData();
-            formData.append('file', imageFile);  // Must match your main.py parameter
-            formData.append('question', question);
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('question', question);
 
-            responseDiv.textContent = "Processing...";
+      statusEl.textContent = 'Thinking...';
 
-            try {
-                const res = await fetch('/ask', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!res.ok) throw new Error("Request failed");
-
-                const data = await res.json();
-                responseDiv.textContent = "Answer: " + data.answer;
-            } catch (err) {
-                responseDiv.textContent = "Error: " + err.message;
-            }
+      try {
+        const response = await fetch('/v1/vqa', {
+          method: 'POST',
+          body: formData
         });
-    </script>
+
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({ detail: 'Request failed' }));
+          throw new Error(detail.detail || 'Request failed');
+        }
+
+        const data = await response.json();
+        answerEl.textContent = data.answer || 'No answer returned.';
+        statusEl.textContent = 'Done.';
+      } catch (err) {
+        console.error(err);
+        errorEl.textContent = err.message || 'Something went wrong.';
+        statusEl.textContent = 'Error.';
+      }
+    });
+  </script>
 </body>
 </html>
